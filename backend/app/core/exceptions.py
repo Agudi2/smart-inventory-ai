@@ -29,3 +29,8 @@ class UnauthorizedException(InventoryException):
 class ValidationException(InventoryException):
     """Raised when data validation fails."""
     pass
+
+
+class NotFoundException(InventoryException):
+    """Raised when a resource is not found."""
+    pass

@@ -8,6 +8,12 @@ from app.schemas.auth import (
     UserResponse,
     UserUpdate
 )
+from app.schemas.product import (
+    ProductBase,
+    ProductCreate,
+    ProductUpdate,
+    ProductResponse
+)
 
 __all__ = [
     "UserRegister",
@@ -15,5 +21,9 @@ __all__ = [
     "TokenResponse",
     "TokenRefresh",
     "UserResponse",
-    "UserUpdate"
+    "UserUpdate",
+    "ProductBase",
+    "ProductCreate",
+    "ProductUpdate",
+    "ProductResponse"
 ]

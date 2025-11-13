@@ -10,7 +10,8 @@ from app.core.exceptions import (
     InsufficientStockException,
     BarcodeNotFoundException,
     UnauthorizedException,
-    ValidationException
+    ValidationException,
+    NotFoundException
 )
 
 
@@ -46,6 +47,17 @@ def create_application() -> FastAPI:
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Register custom exception handlers."""
+    
+    @app.exception_handler(NotFoundException)
+    async def not_found_handler(request: Request, exc: NotFoundException):
+        return JSONResponse(
+            status_code=404,
+            content={
+                "error": "Resource not found",
+                "detail": str(exc),
+                "type": "NotFoundException"
+            }
+        )
     
     @app.exception_handler(ProductNotFoundException)
     async def product_not_found_handler(request: Request, exc: ProductNotFoundException):
@@ -161,9 +173,25 @@ def register_routes(app: FastAPI) -> None:
     from app.api.routes import auth
     app.include_router(auth.router, prefix=settings.api_v1_prefix)
     
+    # Import and register product routes
+    from app.api.routes import products
+    app.include_router(products.router, prefix=settings.api_v1_prefix)
+    
+    # Import and register inventory routes
+    from app.api.routes import inventory
+    app.include_router(inventory.router, prefix=settings.api_v1_prefix)
+    
+    # Import and register barcode routes
+    from app.api.routes import barcode
+    app.include_router(barcode.router, prefix=settings.api_v1_prefix)
+    
+    # Import and register vendor routes
+    from app.api.routes import vendors
+    app.include_router(vendors.router, prefix=settings.api_v1_prefix)
+    
     # API v1 routes will be added here in future tasks
-    # from app.api.routes import products, inventory, barcode, predictions, vendors, alerts
-    # app.include_router(products.router, prefix=settings.api_v1_prefix, tags=["products"])
+    # from app.api.routes import predictions, alerts
+    # app.include_router(predictions.router, prefix=settings.api_v1_prefix, tags=["predictions"])
     # etc.
 
 
