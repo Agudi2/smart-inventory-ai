@@ -70,6 +70,22 @@ A full-stack SaaS application designed for small businesses to track products, s
    - Celery worker for background tasks
    - Celery beat for scheduled tasks
 
+   **Optional: Seed with sample data** (first time setup)
+   
+   Edit `docker-compose.yml` and set `SEED_DATABASE: "true"` in the backend service, then:
+   ```bash
+   docker-compose up --build
+   ```
+   
+   This will populate the database with:
+   - 4 sample users (admin, manager, user roles)
+   - 26 products across 6 categories
+   - 6 vendors with pricing
+   - 90 days of transaction history
+   - Sample alerts
+   
+   See `backend/SEED_DATA_QUICK_START.md` for login credentials and details.
+
 3. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
@@ -122,17 +138,23 @@ A full-stack SaaS application designed for small businesses to track products, s
    alembic upgrade head
    ```
 
-6. **Start the development server**
+6. **(Optional) Seed database with sample data**
+   ```bash
+   python seed_data.py
+   ```
+   See `backend/SEED_DATA_README.md` for details.
+
+7. **Start the development server**
    ```bash
    uvicorn app.main:app --reload
    ```
 
-7. **Start Celery worker (in separate terminal)**
+8. **Start Celery worker (in separate terminal)**
    ```bash
    celery -A app.celery_app worker --loglevel=info
    ```
 
-8. **Start Celery beat (in separate terminal)**
+9. **Start Celery beat (in separate terminal)**
    ```bash
    celery -A app.celery_app beat --loglevel=info
    ```
@@ -287,21 +309,57 @@ alembic downgrade -1
 
 ## Deployment
 
-### Frontend (Vercel/Netlify)
-1. Connect your Git repository
-2. Set build command: `npm run build`
-3. Set output directory: `dist`
-4. Add environment variable: `VITE_API_URL`
+### Quick Deployment (30 minutes)
 
-### Backend (Railway/Render)
-1. Connect your Git repository
-2. Select backend directory
-3. Add environment variables (DATABASE_URL, REDIS_URL, JWT_SECRET)
-4. Deploy with Dockerfile
+Deploy to production using Railway (backend) and Vercel (frontend):
 
-### Database
-- Use managed PostgreSQL (Railway Postgres, Supabase, AWS RDS)
-- Run migrations after deployment: `alembic upgrade head`
+📖 **[Quick Start Deployment Guide](DEPLOYMENT_QUICKSTART.md)** - Get deployed in under 30 minutes
+
+### Comprehensive Deployment
+
+For detailed deployment instructions, configuration, and best practices:
+
+📖 **[Full Deployment Guide](DEPLOYMENT.md)** - Complete deployment documentation
+
+Includes:
+- Railway backend deployment
+- Vercel frontend deployment
+- Database setup and migrations
+- Environment variable configuration
+- CI/CD pipeline setup with GitHub Actions
+- Monitoring and maintenance
+- Troubleshooting guide
+
+### Database Migrations
+
+For production database migration strategy:
+
+📖 **[Database Migration Strategy](DATABASE_MIGRATION_STRATEGY.md)** - Migration best practices
+
+### Self-Hosted Deployment
+
+For self-hosted production deployment using Docker:
+
+```bash
+# Copy and configure environment variables
+cp .env.production.example .env.production
+# Edit .env.production with your values
+
+# Start production stack
+docker-compose -f docker-compose.prod.yml up -d
+
+# Run migrations
+docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+```
+
+### Deployment Options
+
+| Platform | Component | Cost | Difficulty | Recommended For |
+|----------|-----------|------|------------|-----------------|
+| Railway | Backend + DB | $5-20/mo | Easy | Production |
+| Vercel | Frontend | Free-$20/mo | Easy | Production |
+| Docker | Full Stack | Server cost | Medium | Self-hosted |
+| AWS/GCP | Full Stack | Variable | Hard | Enterprise |
 
 ## Troubleshooting
 

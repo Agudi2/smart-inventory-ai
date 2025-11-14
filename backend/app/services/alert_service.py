@@ -1,5 +1,6 @@
 """Alert service for business logic and alert management operations."""
 
+import logging
 from datetime import datetime, timedelta, date
 from typing import List, Optional
 from uuid import UUID
@@ -13,6 +14,8 @@ from app.models.alert import Alert
 from app.models.product import Product
 from app.models.ml_prediction import MLPrediction
 from app.schemas.alert import AlertCreate
+
+logger = logging.getLogger(__name__)
 
 
 class AlertService:
@@ -86,12 +89,13 @@ class AlertService:
         
         return alert
     
-    def create_alert(self, alert_data: AlertCreate) -> Alert:
+    def create_alert(self, alert_data: AlertCreate, send_email: bool = True) -> Alert:
         """
         Create a new alert.
         
         Args:
             alert_data: Alert creation data
+            send_email: Whether to send email notification (default: True)
             
         Returns:
             Created Alert object
@@ -114,6 +118,13 @@ class AlertService:
         self.db.add(alert)
         self.db.commit()
         self.db.refresh(alert)
+        
+        # Send email notification if enabled
+        if send_email and settings.email_notifications_enabled:
+            try:
+                self.send_alert_email(alert)
+            except Exception as e:
+                logger.error(f"Failed to send email for alert {alert.id}: {str(e)}")
         
         return alert
     
@@ -365,3 +376,28 @@ class AlertService:
             self.db.commit()
         
         return resolved_count
+    
+    def send_alert_email(self, alert: Alert, recipient_emails: Optional[List[str]] = None) -> bool:
+        """
+        Send email notification for an alert.
+        
+        Args:
+            alert: Alert object to send notification for
+            recipient_emails: Optional list of recipient emails (defaults to configured recipients)
+            
+        Returns:
+            True if email sent successfully, False otherwise
+        """
+        if not settings.email_notifications_enabled:
+            logger.debug("Email notifications are disabled")
+            return False
+        
+        try:
+            from app.services.email_service import EmailService
+            
+            email_service = EmailService()
+            return email_service.send_alert_email(alert, recipient_emails)
+            
+        except Exception as e:
+            logger.error(f"Failed to send alert email: {str(e)}", exc_info=True)
+            return False

@@ -56,6 +56,8 @@ class AlertSettingsResponse(BaseModel):
     alert_threshold_days: int = Field(..., description="Days before predicted depletion to trigger alert")
     low_stock_enabled: bool = Field(default=True, description="Enable low stock alerts")
     predicted_depletion_enabled: bool = Field(default=True, description="Enable predicted depletion alerts")
+    email_notifications_enabled: bool = Field(default=False, description="Enable email notifications for alerts")
+    alert_recipient_emails: list[str] = Field(default=[], description="List of email addresses to receive alert notifications")
 
 
 class AlertSettingsUpdate(BaseModel):
@@ -64,3 +66,5 @@ class AlertSettingsUpdate(BaseModel):
     alert_threshold_days: Optional[int] = Field(None, ge=1, le=90, description="Days before predicted depletion to trigger alert")
     low_stock_enabled: Optional[bool] = Field(None, description="Enable low stock alerts")
     predicted_depletion_enabled: Optional[bool] = Field(None, description="Enable predicted depletion alerts")
+    email_notifications_enabled: Optional[bool] = Field(None, description="Enable email notifications for alerts")
+    alert_recipient_emails: Optional[list[str]] = Field(None, description="List of email addresses to receive alert notifications")

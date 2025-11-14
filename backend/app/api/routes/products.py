@@ -23,7 +23,38 @@ def get_product_service(db: Session = Depends(get_db)) -> ProductService:
     return ProductService(db)
 
 
-@router.get("", response_model=List[ProductResponse])
+@router.get(
+    "",
+    response_model=List[ProductResponse],
+    summary="List all products",
+    description="Retrieve all products with optional filtering and pagination.",
+    responses={
+        200: {
+            "description": "List of products retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": "123e4567-e89b-12d3-a456-426614174000",
+                            "sku": "WDG-001",
+                            "name": "Widget A",
+                            "category": "Electronics",
+                            "current_stock": 150,
+                            "reorder_threshold": 20,
+                            "barcode": "012345678905",
+                            "unit_cost": 12.99,
+                            "stock_status": "sufficient",
+                            "predicted_depletion_date": None,
+                            "created_at": "2024-01-01T00:00:00Z",
+                            "updated_at": "2024-01-15T10:30:00Z"
+                        }
+                    ]
+                }
+            }
+        },
+        401: {"description": "Not authenticated"}
+    }
+)
 async def list_products(
     category: Optional[str] = Query(None, description="Filter by category"),
     search: Optional[str] = Query(None, description="Search in name, SKU, or category"),
@@ -33,12 +64,32 @@ async def list_products(
     product_service: ProductService = Depends(get_product_service)
 ) -> List[ProductResponse]:
     """
-    Retrieve all products with optional filtering.
+    Retrieve all products with optional filtering and pagination.
     
-    - **category**: Filter products by category
-    - **search**: Search for products by name, SKU, or category
-    - **skip**: Number of records to skip for pagination
-    - **limit**: Maximum number of records to return
+    Returns a list of all products in the inventory system with their current
+    stock levels, status indicators, and optional ML predictions.
+    
+    **Query Parameters:**
+    - **category**: Filter products by category (e.g., "Electronics", "Food")
+    - **search**: Search for products by name, SKU, or category (case-insensitive)
+    - **skip**: Number of records to skip (for pagination, default: 0)
+    - **limit**: Maximum number of records to return (1-1000, default: 100)
+    
+    **Stock Status Values:**
+    - `sufficient`: Stock level is above reorder threshold
+    - `low`: Stock level is at or below reorder threshold but above zero
+    - `critical`: Stock level is zero or negative
+    
+    **Returns:**
+    - List of products with complete information
+    - Stock status calculated based on current stock vs reorder threshold
+    - Predicted depletion date (if ML prediction available)
+    
+    **Use Cases:**
+    - Display inventory dashboard
+    - Product catalog browsing
+    - Stock level monitoring
+    - Category-based inventory views
     """
     products = product_service.get_all_products(
         category=category,
@@ -101,22 +152,78 @@ async def get_product(
     return ProductResponse(**product_dict)
 
 
-@router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ProductResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new product",
+    description="Add a new product to the inventory system.",
+    responses={
+        201: {
+            "description": "Product created successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "sku": "WDG-001",
+                        "name": "Widget A",
+                        "category": "Electronics",
+                        "current_stock": 100,
+                        "reorder_threshold": 20,
+                        "barcode": "012345678905",
+                        "unit_cost": 12.99,
+                        "stock_status": "sufficient",
+                        "predicted_depletion_date": None,
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "updated_at": "2024-01-15T10:30:00Z"
+                    }
+                }
+            }
+        },
+        400: {"description": "Invalid product data or duplicate SKU/barcode"},
+        401: {"description": "Not authenticated"},
+        422: {"description": "Validation error"}
+    }
+)
 async def create_product(
     product_data: ProductCreate,
     current_user: User = Depends(get_current_user),
     product_service: ProductService = Depends(get_product_service)
 ) -> ProductResponse:
     """
-    Create a new product.
+    Create a new product in the inventory system.
     
-    - **sku**: Stock Keeping Unit (unique identifier)
-    - **name**: Product name
-    - **category**: Product category
-    - **current_stock**: Initial stock quantity
-    - **reorder_threshold**: Minimum stock level before reorder alert
+    **Request Body:**
+    - **sku**: Stock Keeping Unit - unique identifier (required)
+    - **name**: Product name (required)
+    - **category**: Product category (required)
+    - **current_stock**: Initial stock quantity (required, must be >= 0)
+    - **reorder_threshold**: Minimum stock level before reorder alert (required, must be >= 0)
     - **barcode**: Optional barcode (must be unique if provided)
-    - **unit_cost**: Optional cost per unit
+    - **unit_cost**: Optional cost per unit in decimal format
+    
+    **Validation:**
+    - SKU must be unique across all products
+    - Barcode must be unique if provided
+    - Stock and threshold must be non-negative
+    
+    **Returns:**
+    - Created product with generated UUID
+    - Initial stock status calculated
+    - Timestamps for creation
+    
+    **Example Request:**
+    ```json
+    {
+        "sku": "WDG-001",
+        "name": "Widget A",
+        "category": "Electronics",
+        "current_stock": 100,
+        "reorder_threshold": 20,
+        "barcode": "012345678905",
+        "unit_cost": 12.99
+    }
+    ```
     """
     product = product_service.create_product(product_data)
     

@@ -34,10 +34,94 @@ def create_application() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
+        description="""
+## Smart Inventory Management System API
+
+A comprehensive inventory management system with AI-powered stock prediction capabilities.
+
+### Features
+
+* **Product Management**: Create, read, update, and delete products with SKU tracking
+* **Barcode Scanning**: Scan and lookup products using barcodes
+* **Inventory Tracking**: Track stock movements and adjustments with full history
+* **ML Predictions**: AI-powered stock depletion forecasting using Prophet
+* **Vendor Management**: Compare vendor prices and get restocking recommendations
+* **Smart Alerts**: Automated low stock and predicted depletion alerts
+* **Authentication**: Secure JWT-based authentication system
+
+### Authentication
+
+Most endpoints require authentication using JWT tokens. To authenticate:
+
+1. Register a new account using `POST /api/v1/auth/register`
+2. Login using `POST /api/v1/auth/login` to receive access and refresh tokens
+3. Include the access token in the `Authorization` header: `Bearer <token>`
+4. Refresh expired tokens using `POST /api/v1/auth/refresh`
+
+### Rate Limiting
+
+API requests are rate-limited to ensure fair usage and system stability.
+
+### Support
+
+For issues or questions, please refer to the project documentation.
+        """,
         debug=settings.debug,
         docs_url="/docs",
         redoc_url="/redoc",
-        openapi_url=f"{settings.api_v1_prefix}/openapi.json"
+        openapi_url=f"{settings.api_v1_prefix}/openapi.json",
+        openapi_tags=[
+            {
+                "name": "Authentication",
+                "description": "User authentication and authorization endpoints. Register, login, and manage JWT tokens."
+            },
+            {
+                "name": "products",
+                "description": "Product management operations. Create, read, update, and delete products with SKU tracking and stock status."
+            },
+            {
+                "name": "inventory",
+                "description": "Inventory tracking and stock movement operations. Adjust stock levels and view transaction history."
+            },
+            {
+                "name": "barcode",
+                "description": "Barcode scanning and lookup operations. Scan barcodes to identify products and update inventory."
+            },
+            {
+                "name": "vendors",
+                "description": "Vendor management and price comparison. Manage suppliers and compare pricing for restocking decisions."
+            },
+            {
+                "name": "predictions",
+                "description": "ML-powered stock depletion predictions. Train models and forecast when products will run out of stock."
+            },
+            {
+                "name": "alerts",
+                "description": "Alert management for low stock and predicted depletion. View, acknowledge, and resolve inventory alerts."
+            },
+            {
+                "name": "monitoring",
+                "description": "System health checks and monitoring endpoints. Check service status and view system metrics."
+            }
+        ],
+        contact={
+            "name": "Smart Inventory System",
+            "url": "https://github.com/yourusername/smart-inventory-system",
+        },
+        license_info={
+            "name": "MIT License",
+            "url": "https://opensource.org/licenses/MIT",
+        },
+        servers=[
+            {
+                "url": "http://localhost:8000",
+                "description": "Development server"
+            },
+            {
+                "url": "https://api.yourdomain.com",
+                "description": "Production server"
+            }
+        ]
     )
     
     # Startup event

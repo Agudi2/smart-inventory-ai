@@ -21,7 +21,34 @@ from app.schemas.vendor import (
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
 
-@router.get("", response_model=List[VendorWithPricesResponse])
+@router.get(
+    "",
+    response_model=List[VendorWithPricesResponse],
+    summary="List all vendors",
+    description="Retrieve all vendors with pagination and product count.",
+    responses={
+        200: {
+            "description": "List of vendors retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": "123e4567-e89b-12d3-a456-426614174000",
+                            "name": "Acme Supplies",
+                            "contact_email": "sales@acme.com",
+                            "contact_phone": "+1-555-0100",
+                            "address": "123 Main St, City, State 12345",
+                            "created_at": "2024-01-01T00:00:00Z",
+                            "updated_at": "2024-01-15T10:30:00Z",
+                            "product_count": 25
+                        }
+                    ]
+                }
+            }
+        },
+        401: {"description": "Not authenticated"}
+    }
+)
 def get_vendors(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
@@ -29,9 +56,24 @@ def get_vendors(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get all vendors with pagination.
+    Retrieve all vendors with pagination.
     
-    Returns a list of all vendors in the system.
+    Returns a paginated list of all vendors in the system, including
+    the number of products each vendor supplies.
+    
+    **Query Parameters:**
+    - **skip**: Number of records to skip (for pagination, default: 0)
+    - **limit**: Maximum number of records to return (1-1000, default: 100)
+    
+    **Returns:**
+    - List of vendors with contact information
+    - Product count for each vendor
+    - Creation and update timestamps
+    
+    **Use Cases:**
+    - Display vendor directory
+    - Vendor management dashboard
+    - Supplier selection for new products
     """
     service = VendorService(db)
     vendors = service.get_all_vendors(skip=skip, limit=limit)
@@ -68,16 +110,63 @@ def get_vendor(
     return service.get_vendor_by_id(vendor_id)
 
 
-@router.post("", response_model=VendorResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=VendorResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new vendor",
+    description="Add a new vendor/supplier to the system.",
+    responses={
+        201: {
+            "description": "Vendor created successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "name": "Acme Supplies",
+                        "contact_email": "sales@acme.com",
+                        "contact_phone": "+1-555-0100",
+                        "address": "123 Main St, City, State 12345",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "updated_at": "2024-01-15T10:30:00Z"
+                    }
+                }
+            }
+        },
+        400: {"description": "Invalid vendor data"},
+        401: {"description": "Not authenticated"}
+    }
+)
 def create_vendor(
     vendor_data: VendorCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Create a new vendor.
+    Create a new vendor/supplier.
     
-    Requires authentication.
+    Add a new vendor to the system for product sourcing and price comparison.
+    After creating a vendor, you can add product prices using the vendor prices endpoints.
+    
+    **Request Body:**
+    - **name**: Vendor name (required)
+    - **contact_email**: Email address for vendor contact (optional)
+    - **contact_phone**: Phone number for vendor contact (optional)
+    - **address**: Physical address of vendor (optional)
+    
+    **Returns:**
+    - Created vendor with generated UUID
+    - Timestamps for creation and last update
+    
+    **Example Request:**
+    ```json
+    {
+        "name": "Acme Supplies",
+        "contact_email": "sales@acme.com",
+        "contact_phone": "+1-555-0100",
+        "address": "123 Main St, City, State 12345"
+    }
+    ```
     """
     service = VendorService(db)
     return service.create_vendor(vendor_data)
@@ -115,7 +204,35 @@ def delete_vendor(
     return None
 
 
-@router.post("/{vendor_id}/prices", response_model=VendorPriceResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{vendor_id}/prices",
+    response_model=VendorPriceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add vendor price for product",
+    description="Add or update pricing information for a product from this vendor.",
+    responses={
+        201: {
+            "description": "Vendor price added successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "vendor_id": "123e4567-e89b-12d3-a456-426614174001",
+                        "product_id": "123e4567-e89b-12d3-a456-426614174002",
+                        "unit_price": 12.99,
+                        "lead_time_days": 7,
+                        "minimum_order_quantity": 10,
+                        "last_updated": "2024-01-15T10:30:00Z",
+                        "is_recommended": False
+                    }
+                }
+            }
+        },
+        400: {"description": "Invalid price data"},
+        401: {"description": "Not authenticated"},
+        404: {"description": "Vendor or product not found"}
+    }
+)
 def add_vendor_price(
     vendor_id: UUID,
     price_data: VendorPriceCreate,
@@ -123,10 +240,39 @@ def add_vendor_price(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Add or update a vendor price for a product.
+    Add or update vendor pricing for a product.
     
-    If a price already exists for this vendor-product combination, it will be updated.
-    Otherwise, a new price record will be created.
+    This endpoint allows you to set or update the price a vendor charges for
+    a specific product. If a price already exists for this vendor-product
+    combination, it will be updated with the new information.
+    
+    **Path Parameters:**
+    - **vendor_id**: UUID of the vendor
+    
+    **Request Body:**
+    - **product_id**: UUID of the product (required)
+    - **unit_price**: Price per unit in decimal format (required)
+    - **lead_time_days**: Number of days for delivery (optional, default: 7)
+    - **minimum_order_quantity**: Minimum order quantity (optional, default: 1)
+    
+    **Returns:**
+    - Complete vendor price record with timestamps
+    - is_recommended flag (calculated based on price comparison)
+    
+    **Use Cases:**
+    - Adding new vendor pricing during product setup
+    - Updating prices when vendors change their rates
+    - Comparing multiple vendor options for restocking
+    
+    **Example Request:**
+    ```json
+    {
+        "product_id": "123e4567-e89b-12d3-a456-426614174002",
+        "unit_price": 12.99,
+        "lead_time_days": 7,
+        "minimum_order_quantity": 10
+    }
+    ```
     """
     service = VendorService(db)
     vendor_price = service.add_vendor_price(vendor_id, price_data)

@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     
     # Alert Settings
     alert_threshold_days: int = 7
+    email_notifications_enabled: bool = False
+    
+    # Email Settings
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: str = "Smart Inventory System"
+    alert_recipient_emails: list[str] = []
     
     # External APIs
     barcode_api_key: Optional[str] = None

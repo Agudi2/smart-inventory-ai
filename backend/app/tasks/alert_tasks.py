@@ -242,20 +242,19 @@ def auto_resolve_alerts(self) -> Dict[str, Any]:
     max_retries=3,
     default_retry_delay=60  # 1 minute
 )
-def send_alert_notification(self, alert_id: str) -> Dict[str, Any]:
+def send_alert_notification(self, alert_id: str, recipient_emails: Optional[list] = None) -> Dict[str, Any]:
     """
     Send email notification for a specific alert.
     
-    This task is designed for future email notification implementation.
-    
     Args:
         alert_id: UUID string of the alert
+        recipient_emails: Optional list of recipient email addresses
     
     Returns:
         Dictionary with notification status
     """
     try:
-        logger.info(f"Sending notification for alert {alert_id}")
+        logger.info(f"Sending email notification for alert {alert_id}")
         
         # Initialize alert service
         alert_service = AlertService(self.db)
@@ -264,18 +263,23 @@ def send_alert_notification(self, alert_id: str) -> Dict[str, Any]:
         from uuid import UUID
         alert = alert_service.get_alert_by_id(UUID(alert_id))
         
-        # TODO: Implement email sending logic here
-        # For now, just log the alert
-        logger.info(
-            f"Alert notification: {alert.alert_type} - {alert.severity} - "
-            f"Product: {alert.product.name} - {alert.message}"
-        )
+        # Send email notification
+        email_sent = alert_service.send_alert_email(alert, recipient_emails)
         
-        result = {
-            "success": True,
-            "alert_id": alert_id,
-            "message": "Notification logged (email sending not yet implemented)"
-        }
+        if email_sent:
+            result = {
+                "success": True,
+                "alert_id": alert_id,
+                "message": f"Email notification sent for {alert.alert_type} alert"
+            }
+            logger.info(f"Email notification sent successfully for alert {alert_id}")
+        else:
+            result = {
+                "success": False,
+                "alert_id": alert_id,
+                "message": "Email notification failed or disabled"
+            }
+            logger.warning(f"Email notification not sent for alert {alert_id}")
         
         return result
         
@@ -292,4 +296,71 @@ def send_alert_notification(self, alert_id: str) -> Dict[str, Any]:
             "alert_id": alert_id,
             "error": str(e),
             "message": f"Notification failed after {self.max_retries} retries"
+        }
+
+
+@celery_app.task(
+    bind=True,
+    base=DatabaseTask,
+    name="app.tasks.alert_tasks.send_batch_alert_notifications",
+    max_retries=2,
+    default_retry_delay=300  # 5 minutes
+)
+def send_batch_alert_notifications(self, alert_ids: List[str], recipient_emails: Optional[list] = None) -> Dict[str, Any]:
+    """
+    Send email notifications for multiple alerts in batch.
+    
+    Args:
+        alert_ids: List of alert UUID strings
+        recipient_emails: Optional list of recipient email addresses
+    
+    Returns:
+        Dictionary with batch notification status
+    """
+    try:
+        logger.info(f"Sending batch email notifications for {len(alert_ids)} alerts")
+        
+        # Initialize alert service
+        alert_service = AlertService(self.db)
+        
+        success_count = 0
+        failed_count = 0
+        
+        for alert_id in alert_ids:
+            try:
+                from uuid import UUID
+                alert = alert_service.get_alert_by_id(UUID(alert_id))
+                
+                if alert_service.send_alert_email(alert, recipient_emails):
+                    success_count += 1
+                else:
+                    failed_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Failed to send notification for alert {alert_id}: {str(e)}")
+                failed_count += 1
+        
+        result = {
+            "success": True,
+            "total_alerts": len(alert_ids),
+            "emails_sent": success_count,
+            "emails_failed": failed_count,
+            "message": f"Batch notification completed: {success_count} sent, {failed_count} failed"
+        }
+        
+        logger.info(f"Batch notification completed: {success_count}/{len(alert_ids)} emails sent")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in batch notification: {str(e)}", exc_info=True)
+        
+        # Retry the task if we haven't exceeded max retries
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying batch notification (attempt {self.request.retries + 1})")
+            raise self.retry(exc=e)
+        
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Batch notification failed after {self.max_retries} retries"
         }

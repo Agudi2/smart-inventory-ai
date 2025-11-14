@@ -46,16 +46,32 @@ services:
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 15
       ENVIRONMENT: development
+      SEED_DATABASE: "false"  # Set to "true" to seed database on startup
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./ml_models:/app/ml_models
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: >
+      sh -c "
+      if [ \"$$SEED_DATABASE\" = \"true\" ]; then
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Seeding database...' &&
+        python seed_data.py &&
+        echo 'Starting application...'
+      else
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting application...'
+      fi &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
 
   # Celery Worker for Background Tasks
   celery_worker:
