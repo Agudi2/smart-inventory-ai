@@ -48,14 +48,50 @@ For detailed database setup information, see [DATABASE_SETUP.md](DATABASE_SETUP.
 
 ### Running the Application
 
-Development mode:
+#### Using Docker Compose (Recommended)
+
+```bash
+# Start all services (backend, database, redis, celery)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f backend
+
+# Stop all services
+docker-compose down
+```
+
+#### Manual Development Mode
+
+1. Start the FastAPI server:
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Or using Python:
+2. Start Celery worker (in a separate terminal):
 ```bash
-python -m app.main
+celery -A app.core.celery_app:celery_app worker --loglevel=info
+```
+
+3. Start Celery Beat scheduler (in a separate terminal):
+```bash
+celery -A app.core.celery_app:celery_app beat --loglevel=info
+```
+
+### Background Tasks with Celery
+
+The application uses Celery for background task processing:
+
+- **ML Model Training**: Weekly training of forecasting models (Sundays at 2 AM)
+- **Alert Checking**: Hourly checks for low stock and predicted depletion alerts
+- **Auto-Resolve Alerts**: Every 6 hours, automatically resolve invalid alerts
+
+For detailed Celery setup and usage, see [CELERY_SETUP.md](CELERY_SETUP.md)
+
+#### Testing Celery Setup
+
+```bash
+python test_celery_setup.py
 ```
 
 ### API Documentation
@@ -73,15 +109,20 @@ backend/
 │   │   └── routes/          # API endpoint routes
 │   ├── core/                # Core configuration and utilities
 │   │   ├── config.py        # Settings and environment config
+│   │   ├── celery_app.py    # Celery configuration
 │   │   └── exceptions.py    # Custom exceptions
 │   ├── models/              # SQLAlchemy database models
 │   ├── schemas/             # Pydantic schemas for validation
 │   ├── services/            # Business logic layer
 │   ├── ml/                  # Machine learning services
+│   ├── tasks/               # Celery background tasks
+│   │   ├── ml_tasks.py      # ML training tasks
+│   │   └── alert_tasks.py   # Alert checking tasks
 │   └── main.py              # FastAPI application entry point
 ├── alembic/                 # Database migrations
 ├── tests/                   # Test suite
 ├── requirements.txt         # Python dependencies
+├── CELERY_SETUP.md         # Celery documentation
 └── .env.example            # Example environment variables
 ```
 

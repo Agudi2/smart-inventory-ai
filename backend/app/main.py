@@ -1,9 +1,12 @@
+import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
 from app.core.config import settings
+from app.core.logging_config import setup_logging
+from app.core.middleware import RequestLoggingMiddleware
 from app.core.exceptions import (
     InventoryException,
     ProductNotFoundException,
@@ -11,8 +14,18 @@ from app.core.exceptions import (
     BarcodeNotFoundException,
     UnauthorizedException,
     ValidationException,
-    NotFoundException
+    NotFoundException,
+    AlertNotFoundException
 )
+from app.ml.prediction_service import InsufficientDataException
+
+# Setup logging
+setup_logging(
+    log_level="DEBUG" if settings.debug else "INFO",
+    json_logs=not settings.debug  # Use JSON logs in production, plain text in debug
+)
+
+logger = logging.getLogger(__name__)
 
 
 def create_application() -> FastAPI:
@@ -27,6 +40,28 @@ def create_application() -> FastAPI:
         openapi_url=f"{settings.api_v1_prefix}/openapi.json"
     )
     
+    # Startup event
+    @app.on_event("startup")
+    async def startup_event():
+        """Log application startup."""
+        logger.info(
+            f"Application starting: {settings.app_name} v{settings.app_version}",
+            extra={
+                'event': 'startup',
+                'debug_mode': settings.debug,
+                'api_prefix': settings.api_v1_prefix
+            }
+        )
+    
+    # Shutdown event
+    @app.on_event("shutdown")
+    async def shutdown_event():
+        """Log application shutdown."""
+        logger.info(
+            f"Application shutting down: {settings.app_name}",
+            extra={'event': 'shutdown'}
+        )
+    
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
@@ -35,6 +70,9 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    # Add request logging middleware
+    app.add_middleware(RequestLoggingMiddleware)
     
     # Register exception handlers
     register_exception_handlers(app)
@@ -46,10 +84,19 @@ def create_application() -> FastAPI:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """Register custom exception handlers."""
+    """Register custom exception handlers with logging."""
     
     @app.exception_handler(NotFoundException)
     async def not_found_handler(request: Request, exc: NotFoundException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Resource not found: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'NotFoundException'
+            }
+        )
         return JSONResponse(
             status_code=404,
             content={
@@ -61,6 +108,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     
     @app.exception_handler(ProductNotFoundException)
     async def product_not_found_handler(request: Request, exc: ProductNotFoundException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Product not found: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'ProductNotFoundException'
+            }
+        )
         return JSONResponse(
             status_code=404,
             content={
@@ -70,8 +126,37 @@ def register_exception_handlers(app: FastAPI) -> None:
             }
         )
     
+    @app.exception_handler(AlertNotFoundException)
+    async def alert_not_found_handler(request: Request, exc: AlertNotFoundException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Alert not found: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'AlertNotFoundException'
+            }
+        )
+        return JSONResponse(
+            status_code=404,
+            content={
+                "error": "Alert not found",
+                "detail": str(exc),
+                "type": "AlertNotFoundException"
+            }
+        )
+    
     @app.exception_handler(InsufficientStockException)
     async def insufficient_stock_handler(request: Request, exc: InsufficientStockException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Insufficient stock: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'InsufficientStockException'
+            }
+        )
         return JSONResponse(
             status_code=400,
             content={
@@ -81,8 +166,37 @@ def register_exception_handlers(app: FastAPI) -> None:
             }
         )
     
+    @app.exception_handler(InsufficientDataException)
+    async def insufficient_data_handler(request: Request, exc: InsufficientDataException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Insufficient data for prediction: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'InsufficientDataException'
+            }
+        )
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Insufficient data",
+                "detail": str(exc),
+                "type": "InsufficientDataException"
+            }
+        )
+    
     @app.exception_handler(BarcodeNotFoundException)
     async def barcode_not_found_handler(request: Request, exc: BarcodeNotFoundException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Barcode not found: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'BarcodeNotFoundException'
+            }
+        )
         return JSONResponse(
             status_code=404,
             content={
@@ -94,6 +208,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     
     @app.exception_handler(UnauthorizedException)
     async def unauthorized_handler(request: Request, exc: UnauthorizedException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Unauthorized access attempt: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'UnauthorizedException'
+            }
+        )
         return JSONResponse(
             status_code=401,
             content={
@@ -105,6 +228,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     
     @app.exception_handler(ValidationException)
     async def validation_exception_handler(request: Request, exc: ValidationException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Validation error: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'ValidationException'
+            }
+        )
         return JSONResponse(
             status_code=400,
             content={
@@ -116,6 +248,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     
     @app.exception_handler(InventoryException)
     async def inventory_exception_handler(request: Request, exc: InventoryException):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Inventory error: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': exc.__class__.__name__
+            }
+        )
         return JSONResponse(
             status_code=400,
             content={
@@ -127,6 +268,16 @@ def register_exception_handlers(app: FastAPI) -> None:
     
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.warning(
+            f"Request validation error: {exc.errors()}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': 'RequestValidationError',
+                'validation_errors': exc.errors()
+            }
+        )
         return JSONResponse(
             status_code=422,
             content={
@@ -138,6 +289,16 @@ def register_exception_handlers(app: FastAPI) -> None:
     
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
+        correlation_id = getattr(request.state, 'correlation_id', None)
+        logger.error(
+            f"Unhandled exception: {str(exc)}",
+            extra={
+                'correlation_id': correlation_id,
+                'request_path': request.url.path,
+                'error_type': type(exc).__name__
+            },
+            exc_info=True
+        )
         return JSONResponse(
             status_code=500,
             content={
@@ -151,23 +312,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 def register_routes(app: FastAPI) -> None:
     """Register API routes with versioning."""
     
-    # Health check endpoint (no versioning)
-    @app.get("/health")
-    async def health_check():
-        return {
-            "status": "healthy",
-            "app_name": settings.app_name,
-            "version": settings.app_version
-        }
-    
-    # API v1 metrics endpoint
-    @app.get(f"{settings.api_v1_prefix}/metrics")
-    async def get_metrics():
-        return {
-            "status": "ok",
-            "version": "v1",
-            "endpoints": "N/A"
-        }
+    # Import and register monitoring routes (health check and metrics)
+    from app.api.routes import monitoring
+    app.include_router(monitoring.router)
     
     # Import and register auth routes
     from app.api.routes import auth
@@ -189,10 +336,13 @@ def register_routes(app: FastAPI) -> None:
     from app.api.routes import vendors
     app.include_router(vendors.router, prefix=settings.api_v1_prefix)
     
-    # API v1 routes will be added here in future tasks
-    # from app.api.routes import predictions, alerts
-    # app.include_router(predictions.router, prefix=settings.api_v1_prefix, tags=["predictions"])
-    # etc.
+    # Import and register prediction routes
+    from app.api.routes import predictions
+    app.include_router(predictions.router, prefix=settings.api_v1_prefix)
+    
+    # Import and register alert routes
+    from app.api.routes import alerts
+    app.include_router(alerts.router, prefix=settings.api_v1_prefix)
 
 
 # Create the application instance

@@ -14,6 +14,26 @@ from app.schemas.product import (
     ProductUpdate,
     ProductResponse
 )
+from app.schemas.prediction import (
+    DataSummaryResponse,
+    PredictionMetadata,
+    ForecastPoint,
+    PredictionResult,
+    MLPredictionResponse,
+    TrainingRequest,
+    TrainingResponse,
+    BatchPredictionRequest,
+    BatchPredictionResponse
+)
+from app.schemas.alert import (
+    AlertBase,
+    AlertCreate,
+    AlertResponse,
+    AlertAcknowledge,
+    AlertResolve,
+    AlertSettingsResponse,
+    AlertSettingsUpdate
+)
 
 __all__ = [
     "UserRegister",
@@ -25,5 +45,21 @@ __all__ = [
     "ProductBase",
     "ProductCreate",
     "ProductUpdate",
-    "ProductResponse"
+    "ProductResponse",
+    "DataSummaryResponse",
+    "PredictionMetadata",
+    "ForecastPoint",
+    "PredictionResult",
+    "MLPredictionResponse",
+    "TrainingRequest",
+    "TrainingResponse",
+    "BatchPredictionRequest",
+    "BatchPredictionResponse",
+    "AlertBase",
+    "AlertCreate",
+    "AlertResponse",
+    "AlertAcknowledge",
+    "AlertResolve",
+    "AlertSettingsResponse",
+    "AlertSettingsUpdate"
 ]

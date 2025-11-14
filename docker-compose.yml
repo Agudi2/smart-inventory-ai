@@ -66,15 +66,18 @@ services:
     environment:
       DATABASE_URL: postgresql://inventory_user:inventory_pass@db:5432/inventory
       REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
       ENVIRONMENT: development
     volumes:
       - ./backend:/app
+      - ./ml_models:/app/ml_models
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A app.celery_app worker --loglevel=info
+    command: celery -A app.core.celery_app:celery_app worker --loglevel=info --concurrency=2
 
   # Celery Beat for Scheduled Tasks
   celery_beat:
@@ -85,13 +88,15 @@ services:
     environment:
       DATABASE_URL: postgresql://inventory_user:inventory_pass@db:5432/inventory
       REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
       ENVIRONMENT: development
     volumes:
       - ./backend:/app
     depends_on:
       redis:
         condition: service_healthy
-    command: celery -A app.celery_app beat --loglevel=info
+    command: celery -A app.core.celery_app:celery_app beat --loglevel=info
 
   # React Frontend
   frontend:

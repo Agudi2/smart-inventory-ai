@@ -34,3 +34,8 @@ class ValidationException(InventoryException):
 class NotFoundException(InventoryException):
     """Raised when a resource is not found."""
     pass
+
+
+class AlertNotFoundException(InventoryException):
+    """Raised when alert is not found."""
+    pass
